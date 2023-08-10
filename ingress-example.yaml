@@ -1,0 +1,35 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: http-bin
+  namespace: tools
+  annotations:
+    nginx.ingress.kubernetes.io/auth-signin: https://oauth2-proxy.domain.com/oauth2/start?rd=$scheme://$host$escaped_request_uri
+    nginx.ingress.kubernetes.io/auth-url: https://oauth2-proxy.ingress-controllers.svc.cluster.local/oauth2/auth
+    nginx.ingress.kubernetes.io/auth-response-headers: x-username, x-groups
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      auth_request_set $user_groups $upstream_http_x_groups;
+      auth_request_set $user $upstream_http_x_username;
+
+      # The pattern is in Lua language https://www.lua.org/manual/5.4/manual.html#6.4.1
+      auth_request_set $authorized_groups "Group 1,Group 2";
+      auth_request_set $authorized_users "user1,user2";
+
+      # If confitional variables dont exist "or" is assumed (conditionals are case insensitive)
+      auth_request_set $conditional_groups "and";
+      auth_request_set $conditional_user_groups "or";
+
+      access_by_lua_file lua/auth.lua;
+spec:
+  ingressClassName: nginx-internal
+  rules:
+    - host: http-bin.domain.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: http-bin
+                port:
+                  number: 80
